@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
 
+# TODO: notify user if any openings were found (push, email, text, etc.)
+# TODO: add timeout process per attempt (e.g. max time of 3 minutes or something in case of high server traffic)
+# TODO: add flexible _SEARCH_YEAR (especially if searching near edge of year)
+
+# pip3 install pytz
 # pip3 install selenium
 # pip3 install webdriver-manager
 
 import argparse
+import pytz
 import re
 import schedule
 import sys
 import time
 from typing import List, Tuple
 
+from datetime import date
 from datetime import datetime
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, WebDriverException
@@ -39,15 +46,11 @@ class CheckOpenings:
     def __init__(
         self,
         desired_dates: List[Tuple[int, int]],
-        # desired_month: int,
-        # desired_day: int,
         num_of_guests: int,
         url: str = 'https://reserve.pokemon-cafe.jp/',
         max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
         ):
         self._desired_dates = desired_dates
-        # self._desired_month = desired_month
-        # self._desired_day = desired_day
         self._num_of_guests = num_of_guests
         self._url = url
         self._max_attempts = max_attempts
@@ -57,11 +60,11 @@ class CheckOpenings:
         options = Options()
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
+        # options.add_argument('--headless')
         options.add_experimental_option('detach', True)
         if use_proxy:
             if not hasattr(self, 'proxy_pool'):
                 self.generate_proxies()
-            # curr_proxy = next(self.proxy_pool)
             if self.proxy_pool:
                 curr_proxy = self.proxy_pool.pop()
                 print(f'using the next available proxy: {curr_proxy}')
@@ -152,13 +155,6 @@ class CheckOpenings:
         except TimeoutException:
             while '(Reloading)' in driver.page_source:
                 self.reload_congested_page()
-
-#    def click_on_time(self):
-#        try:
-#
-#        except TimeoutException:
-#            while '(Reloading)' in driver.page_source:
-#                self.reload_congested_page()
             
     def reload_congested_page(self):
         print('Server congestion encountered. Attempting to reload page...')
@@ -172,9 +168,9 @@ class CheckOpenings:
             # good_times = self._driver.find_elements(By.XPATH, "//*[@class='status-box']/div[last()][contains(text(), 'Full')]/ancestor::*[self::div[@class='time-cell']]")
             good_times = self._driver.find_elements(By.XPATH, "//*[@class='status-box']/div[last()][not(contains(text(), 'Full'))]/ancestor::*[self::div[@class='time-cell']]")  # THIS IS THE OFFICIAL ONE
             if good_times:
-                print(f'Found {len(good_times)} openings for {self._desired_month}-{self._desired_day}')
+                print(f'*************Found {len(good_times)} openings for {self._desired_month}-{self._desired_day}')
             else:
-                print(f'No cancellations found for {self._desired_month}-{self._desired_day}')
+                print(f'No openings found for {self._desired_month}-{self._desired_day}')
         except TimeoutException:
             while '(Reloading)' in driver.page_source:
                 self.reload_congested_page()
@@ -205,7 +201,6 @@ class CheckOpenings:
             proxy_set = set(proxy_list)
             print(f'found some fresh proxies: {proxy_set}')
             self.proxy_pool = proxy_set
-            # self.proxy_pool = cycle(proxy_set)
             self.shutdown_driver()  # close proxy table page
             return
         print('No valid https proxies available! Relaunch script to attempt from scratch.')
@@ -282,13 +277,23 @@ class CheckOpenings:
                 
                
 def parse_date_list(desired_dates: List[str]):
-    # TODO: make sure parsed dates are actually valid in _SEARCH_YEAR
+    # TODO: add check that desired date(s) isn't more than 31 days in future
+    curr_date_jp = [int(date_part) for date_part in datetime.now(pytz.timezone('Asia/Tokyo')).strftime('%Y-%m-%d').split('-')]
+    curr_date_jp = date(curr_date_jp[0], curr_date_jp[1], curr_date_jp[2])
     # remove duplicates
     desired_dates = set(desired_dates)
     parsed_dates = []
     for desired_date in desired_dates:
         month, day = [int(part) for part in desired_date.split('-')]
-        parsed_dates.append((month, day))
+        # check date is valid and not in past
+        try:
+            valid_date = date(_SEARCH_YEAR, month, day)
+            if valid_date <= curr_date_jp:
+                print(f'\n{desired_date} not a future date in Tokyo local time and will not be included in searched dates')
+            else:
+                parsed_dates.append((month, day))
+        except ValueError as err:
+            print(f'Error encountered while validating {desired_date}: {err}')
     parsed_dates = sorted(parsed_dates, reverse=True)
     return parsed_dates
 
@@ -319,6 +324,9 @@ def main(argv: List[str]):
     args, _ = parser.parse_known_args(argv)
     
     parsed_dates = parse_date_list(args.desired_dates)
+    if not parsed_dates:
+        print('No valid dates remaining after parsing! Aborting...')
+        return
     lets_go = CheckOpenings(desired_dates=parsed_dates,
                             num_of_guests=args.num_of_guests,
                             max_attempts=args.max_attempts,
@@ -326,4 +334,5 @@ def main(argv: List[str]):
     lets_go.check_dates()
     
 if __name__ == '__main__':
+    print(f'\n{datetime.now()}')
     main(sys.argv)
