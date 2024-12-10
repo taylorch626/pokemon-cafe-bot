@@ -20,14 +20,16 @@ pip3 install pytz selenium webdriver-manager
 ```
 
 ## original bot (`pcafe.py`)
-The first bot I built is currently only configured to be run manually when a new date is recently released for the cafe (30 days in advance, IIRC). It's intended to automate the clickops needed to get to the actual booking page on a given day. It is currently configured to automatically pick a time in the middle of the array of available times for the selected booking day, though this can be modified.
+The first bot I built is currently only configured to be run manually when a new date is recently released for the cafe (30 days in advance, IIRC). It's intended to automate the clickops needed to get to the actual booking page on a given day. It is currently configured to automatically pick a time in the middle of the array of available times for the selected booking day, though this can be modified. Note that if an time is successfully selected, the actual booking completion will still need to be done manually within ~15 minutes. That is, this bot gets your foot in the door; it doesn't automate the booking entirely. This is mostly because I never saw the actual booking page while I was writing this bot and couldn't therefore anticipate what clickops would be needed (could potentially update in the future...but I'm unlikely to given my Japan trip has come and gone).
 
 Example command:
 `python pcafe.py --day_of_month=20 --num_of_guests=4 --max_attempts=10`
 
 With some more work (and maybe adapting some of the server overload logic from the cancellations bot), this bot could be a powerful way of jumping onto the website at precisely the time of opening.
 
-Note as well that the "cart" for reservations seems to last about 15 minutes, and from my experience any incomplete carts are released back into the pool precisely every 20 minutes. That is, if you're not successful right at 6:00 PM (JST) then try this bot again at 6:20, 6:40, etc. until the pool is truly exhausted.
+I've currently hard-coded an ability for the bot to hang execution until the specified release time (e.g. 6:00 PM (JST)) (see [here](https://github.com/taylorch626/pokemon-cafe-bot/blob/main/pcafe.py#L226)). With this ability, you can launch the bot a couple of minutes prior to the reservation release time and get it to the selection page where it will patiently wait until the specified time is reached for attempting to grab a booking. The hard-coded time it will wait until is 2:00 AM local time (which for me as of Oct 2024 corresponded to 6:00 PM JST). You will want to confirm that the time specified here is as you expect it. Otherwise, please update it!!!
+
+Note as well that the "cart" for reservations seems to last about 15 minutes, and from my experience any incomplete carts are released back into the pool precisely every 20 minutes. That is, if you're not successful right at 6:00 PM (JST) then try this bot again at 6:20, 6:40, etc. until the pool is truly exhausted. Per the previous paragraph, you'll need to modify [this line](https://github.com/taylorch626/pokemon-cafe-bot/blob/main/pcafe.py#L226) to ensure these updated times are taken into account if you want to keep trying past 6:00 PM.
 
 ## cancellations bot (`pcafe_cancellations.py`)
 
