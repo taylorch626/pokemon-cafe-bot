@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<!-- saved from url=(0052)https://reserve.pokemon-cafe.jp/reserve/auth_confirm -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <title>席の予約</title>
+    <meta name="csrf-param" content="authenticity_token">
+    <meta name="csrf-token" content="8uK5yuIMxiLkqRyBOX2d89Vfo9QQpm6ntPiYcz9Gw6eMD7DWm98yKgtQc9HvXTiB9T+VPQRRTdQ6iw4zl6TlNw==">
+    <style>
+      h1.page-title {
+        font-size: 36px;
+        color: #3c3c3c;
+        font-weight: 500;
+        margin-top: 20px;
+        margin-bottom: 0px !important;
+      }
+      h3.page-english-title {
+        font-size: 18px;
+        color: #3c3c3c;
+        font-weight: 500;
+        margin-top: 0px;
+        margin-bottom: 50px;
+      }
+      .copyright {
+        margin-top: 2%;
+      }
+
+      .copyright-txt {
+        font-size: 0.7rem;
+        text-align: center;
+        font-weight: 400;
+        margin: 0 auto;
+      }
+      @media screen and (min-width: 767.9px) {
+        .pc {
+          display: inline;
+        }
+
+        .sp {
+          display: none;
+        }
+      }
+
+      @media screen and (max-width: 767.9px) {
+        .pc {
+          display: none;
+        }
+
+        .sp {
+          display: inline;
+        }
+
+        .copyright {
+          margin-top: 5%;
+        }
+
+        .copyright-txt {
+          font-size: 0.6rem;
+        }
+      }
+    </style>
+    <link rel="stylesheet" media="all" href="./席の予約_congestion_page_files/application-1a95566431942ca16801d8abf1f88365.css" data-turbolinks-track="reload">
+
+    <meta content="no-cache" name="turbolinks-cache-control">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+  </head>
+  <body>
+    <div class="container">
+      <div class="main columns">
+        <div class="column is-4">
+          <img class="logo" src="./席の予約_congestion_page_files/logo-821305a8aaf9bbdcb6923122cd79d33b1be7d40412fe9950956d1d589ba84cfc.png" alt="Logo">
+        </div>
+        <div class="column is-8">
+          <div>
+            <h1 class="page-title">
+              アクセスが集中し、サイトが混み合っております。
+            </h1>
+            <h3 class="page-english-title">
+              The site is congested due to heavy access.
+            </h3>
+            <p>
+              ご迷惑をおかけいたしますが、しばらく経ってから、再度アクセスしてくださいますようお願い申し上げます。<br>
+              We are sorry for the inconvenience, but please try again later.
+            </p>
+            <br>
+            <p>ポケモンカフェ<br>Pokémon Cafe</p>
+            <div class="button-container">
+              <a class="button arrow-down" href="https://www.pokemoncenter-online.com/cafe/">リロードする<br>(Reloading)</a>
+              <br>
+              <a class="button button-secondary" href="https://www.pokemoncenter-online.com/cafe/">ホームに戻る<br>(Back to the Top Page)</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <footer class="footer">
+      <div class="copyright">
+        <p class="copyright-txt">
+          ©
+          <span class="year">2024</span>
+          Pokémon.<br class="sp">©1995-
+          <span class="year">2024</span>
+          Nintendo/Creatures Inc. /GAME FREAK inc.
+        </p>
+        <p class="copyright-txt">
+          ポケットモンスター・ポケモン・Pokémonは<br class="sp">任天堂・クリーチャーズ・ゲームフリークの登録商標です。
+        </p>
+      </div>
+    </footer>
+    <script>
+      let year = document.getElementsByClassName("year");
+      year[0].innerHTML = new Date().getFullYear();
+      year[1].innerHTML = new Date().getFullYear();
+
+      document
+        .querySelector(".button.arrow-down")
+        .addEventListener("click", function (e) {
+          e.preventDefault();
+          location.reload();
+        });
+
+      document
+        .querySelector(".button.button-secondary")
+        .addEventListener("click", function (e) {
+          var confirmation = confirm("本当に戻りますか？");
+          if (!confirmation) {
+            e.preventDefault();
+          }
+        });
+    </script>
+  
+
+</body></html>
