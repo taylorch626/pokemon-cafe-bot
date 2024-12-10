@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-# TODO: notify user if any openings were found (push, email, text, etc.)
 # TODO: add timeout process per attempt (e.g. max time of 3 minutes or something in case of high server traffic)
 # TODO: add flexible _SEARCH_YEAR (especially if searching near edge of year)
 
@@ -16,16 +15,19 @@ import sys
 import time
 from typing import List, Tuple
 
+from collections import OrderedDict
 from datetime import date
 from datetime import datetime
 from selenium import webdriver
-from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.common.exceptions import TimeoutException, UnexpectedTagNameException, WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
+
+from pushover_setup import PushoverNotifications
 
 _DEFAULT_WAIT_TIME = 5
 _DEFAULT_MAX_ATTEMPTS = 10
@@ -55,6 +57,7 @@ class CheckOpenings:
         self._url = url
         self._max_attempts = max_attempts
         self.n_attempts = 0
+        self.results = OrderedDict()
         
     def setup_driver(self, use_proxy: bool = False):
         options = Options()
@@ -83,6 +86,8 @@ class CheckOpenings:
         except WebDriverException:
             print('Bad proxy / internet connection. Retrying...')
             self.setup_driver(use_proxy=True)
+            if self.exit_flag:
+                return
             self.check_openings()
             
     def shutdown_driver(self):
@@ -105,7 +110,9 @@ class CheckOpenings:
             advance_page_button.click()
             # print('Advanced to next page')
         except TimeoutException:
-            print('Timed out. Starting over...')
+            if self.exit_flag:
+                return
+            print('Timed out in advance_page_1. Starting over...')
             self.check_openings()
             
     def advance_page_2(self):
@@ -115,7 +122,9 @@ class CheckOpenings:
             make_reservation_button.click()
             # print("'Make a reservation' button clicked")
         except TimeoutException:
-            print('Timed out. Starting over...')
+            if self.exit_flag:
+                return
+            print('Timed out in advance_page_2. Starting over...')
             self.check_openings()
             
     def confirm_month(self):
@@ -153,27 +162,39 @@ class CheckOpenings:
             # print('Advanced to next page')
             
         except TimeoutException:
-            while '(Reloading)' in driver.page_source:
+            while '(Reloading)' in self._driver.page_source:
                 self.reload_congested_page()
+                
+        except UnexpectedTagNameException:
+            print('Calendar page loaded incorrectly. Starting over...')
+            if self.exit_flag:
+                return
+            self.check_openings()
+            
             
     def reload_congested_page(self):
         print('Server congestion encountered. Attempting to reload page...')
         reload_button = self._wait.until(EC.element_to_be_clickable((By.XPATH, "//*[@class='button arrow-down']")))
         reload_button.click()
-        self.num_attempts += 1
+        self.n_attempts += 1
         
     def check_num_available(self):
         try:
-            # ~TODO~: update the contains in the xpath to be not(contains(...))
             # good_times = self._driver.find_elements(By.XPATH, "//*[@class='status-box']/div[last()][contains(text(), 'Full')]/ancestor::*[self::div[@class='time-cell']]")
             good_times = self._driver.find_elements(By.XPATH, "//*[@class='status-box']/div[last()][not(contains(text(), 'Full'))]/ancestor::*[self::div[@class='time-cell']]")  # THIS IS THE OFFICIAL ONE
             if good_times:
                 print(f'*************Found {len(good_times)} openings for {self._desired_month}-{self._desired_day}')
             else:
                 print(f'No openings found for {self._desired_month}-{self._desired_day}')
+            self.results.update({f'{self._desired_month}-{self._desired_day}': len(good_times)})
+            self.exit_flag = True
+            print('Exit flag set to True')
+            return
         except TimeoutException:
-            while '(Reloading)' in driver.page_source:
+            while '(Reloading)' in self._driver.page_source:
                 self.reload_congested_page()
+            if self.exit_flag:
+                return
             self.check_openings()
             
     def generate_proxies(self):
@@ -208,11 +229,14 @@ class CheckOpenings:
             
     def check_openings(self):
         self.n_attempts += 1
-        print(f'IP attempt number: {self.n_attempts}')
         if self.n_attempts >= self._max_attempts:
             print('Max attempts reached.')
             return
+        elif self.exit_flag:
+            print('Exiting recursive calls')
+            return
         else:
+            print(f'IP attempt number: {self.n_attempts}')
             if not hasattr(self, '_driver'):
                 self.setup_driver(use_proxy=False)
                 
@@ -234,16 +258,22 @@ class CheckOpenings:
                 # self.snag_booking()
             
             self.advance_page_1()
+            if self.exit_flag:
+                return
             if self._driver.current_url != self._url + 'reserve/auth_confirm':
                 print('Encountered server overload when loading auth_confirm page. Starting over...')
                 self.check_openings()
             
             self.advance_page_2()
+            if self.exit_flag:
+                return
             if self._driver.current_url != self._url + 'reserve/step1':
                 print('Encountered server overload when loading step1 page. Starting over...')
                 self.check_openings()
             
             self.pick_guests_and_date()
+            if self.exit_flag:
+                return
             if self._driver.current_url != self._url + 'reserve/step2':
                 if 'There are no available seats can be found' in self._driver.page_source:
                     print(f'Reservations for {self._desired_month}-{self._desired_day} have not yet been released')
@@ -253,7 +283,9 @@ class CheckOpenings:
             try:
                 page_load_check = self._wait.until(EC.element_to_be_clickable((By.XPATH, "//*[@class='time-cell']")))
             except TimeoutException:
-                print('Timed out. Starting over...')
+                print('Timed out in page_load_check. Starting over...')
+                if self.exit_flag:
+                    return
                 self.check_openings()
             
             self.check_num_available()
@@ -261,17 +293,30 @@ class CheckOpenings:
 #            if self._driver.current_url in [self._url + suffix for suffix in ['', 'reserve/auth_confirm', 'reserve/step1', 'reserve/step2']]:
 #                print('Opening was no good. Starting over...')
 #                self.snag_booking()
-                
+
+    def notify_user(self):
+        title = 'Search Results'
+        message = ''.join([f'[bullet] {v} openings for {k}[nl]' for k, v in self.results.items()])
+        if message == '':
+            message = 'Check validity of input dates.'
+        else:
+            message = message.replace('[bullet]', '\u2022')
+            message = message.replace('[nl]', '\n')
+        pusher = PushoverNotifications()  # Note: currently expected to have TWO Pushover devices set up
+        pusher.send_message(title=title, message=message, priority=1)
+
     def check_dates(self):
         if self._desired_dates:
             curr_date = self._desired_dates.pop()
             self._desired_month = curr_date[0]
             self._desired_day = curr_date[1]
             print(f'\n***Searching openings for {self._desired_month}-{self._desired_day}')
+            self.exit_flag = False
             self.check_openings()
             self.check_dates()
         else:
             print('All dates checked. Shutting down...')
+            self.notify_user()
             self.shutdown_driver()
             self.end_execution()
                 
