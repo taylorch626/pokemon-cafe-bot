@@ -4,11 +4,13 @@
 # pip3 install webdriver-manager
 
 import argparse
+import schedule
 import sys
 import time
 from typing import List
 
 # from itertools import cycle
+from datetime import datetime
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.chrome.options import Options
@@ -43,6 +45,7 @@ class SnagBooking:
         self._url = url
         self._max_attempts = max_attempts
         self.n_attempts = 0
+        self.skip_blocks = False
 
     def setup_driver(self, use_proxy: bool = False):
         options = Options()
@@ -119,12 +122,22 @@ class SnagBooking:
             day_button.click()
             # print(f"Day {self._day_of_month} selected")
             
+        except TimeoutException:
+            print('Timed out. Starting over...')
+            self.snag_booking()
+            
+    def click_on_time(self):
+        try:
             advance_page_button = self._wait.until(EC.element_to_be_clickable((By.XPATH, "//*[@class='button']")))
             advance_page_button.click()
             # print('Advanced to next page')
         except TimeoutException:
-            print('Timed out. Starting over...')
-            self.snag_booking()
+            while '(Reloading)' in driver.page_source:
+                self.reload_congested_page()
+            
+    def reload_congested_page(self):
+        reload_button = self._wait.until(EC.element_to_be_clickable((By.XPATH, "//*[@class='button arrow-down']")))
+        reload_button.click()
         
     def book_if_available(self):
         try:
@@ -172,56 +185,66 @@ class SnagBooking:
         raise ValueError('No valid https proxies available! Relaunch script to attempt from scratch.')
             
     def snag_booking(self):
-    	self.n_attempts += 1
-    	print(self.n_attempts)
-    	if self.n_attempts >= self._max_attempts:
-    	    print('Max attempts reached.')
-    	    sys.exit()
-    	else:
-            if not hasattr(self, '_driver'):
-                self.setup_driver(use_proxy=False)
-            
-            self.load_root_url()
-            # check if page loaded (especially for proxies)
-            if (self._driver.title != '席の予約'):
-                if self._driver.title == '403 Forbidden':
-                    print('Bot detected! Rotate!')
-                else:
-                    print('Bad proxy / internet connection. Retrying...')
-                self.setup_driver(use_proxy=True)
+        self.n_attempts += 1
+        print(self.n_attempts)
+        if self.n_attempts >= self._max_attempts:
+            print('Max attempts reached.')
+            sys.exit()
+        else:
+            if not self.skip_blocks:
+                if not hasattr(self, '_driver'):
+                    self.setup_driver(use_proxy=False)
+                
                 self.load_root_url()
-            if self._driver.current_url != self._url:
-                # haven't actually encountered this in practice yet, but could be an edge case.
-                print(f'Loaded url: {self._driver.current_url}')
-                print(f'Page title: {self._driver.title}')
-                print('Encountered server error when loading root url. Starting over...')
-                time.sleep(2)
-                # self.snag_booking()
-            
-            self.advance_page_1()
-            if self._driver.current_url != self._url + 'reserve/auth_confirm':
-                print('Encountered server overload when loading auth_confirm page. Starting over...')
-                self.snag_booking()
-            
-            self.advance_page_2()
-            if self._driver.current_url != self._url + 'reserve/step1':
-                print('Encountered server overload when loading step1 page. Starting over...')
-                self.snag_booking()
-            
-            self.pick_guests_and_date()
-            if self._driver.current_url != self._url + 'reserve/step2':
-                print('Encountered server overload or no availability when loading step2 page. Starting over...')
-                self.snag_booking()
-            try:
-                page_load_check = self._wait.until(EC.element_to_be_clickable((By.XPATH, "//*[@class='time-cell']")))
-            except TimeoutException:
-                print('Timed out. Starting over...')
-                self.snag_booking()
-            
-            self.book_if_available()
-            time.sleep(_DEFAULT_WAIT_TIME) # wait for as-yet-unknown subsequent page to load
-            if self._driver.current_url in [self._url + suffix for suffix in ['', 'reserve/auth_confirm', 'reserve/step1', 'reserve/step2']]:
-                print('Opening was no good. Starting over...')
+                # check if page loaded (especially for proxies)
+                if (self._driver.title != '席の予約'):
+                    if self._driver.title == '403 Forbidden':
+                        print('Bot detected! Rotate!')
+                    else:
+                        print('Bad proxy / internet connection. Retrying...')
+                    self.setup_driver(use_proxy=True)
+                    self.load_root_url()
+                if self._driver.current_url != self._url:
+                    # haven't actually encountered this in practice yet, but could be an edge case.
+                    print(f'Loaded url: {self._driver.current_url}')
+                    print(f'Page title: {self._driver.title}')
+                    print('Encountered server error when loading root url. Starting over...')
+                    time.sleep(2)
+                    # self.snag_booking()
+                
+                self.advance_page_1()
+                if self._driver.current_url != self._url + 'reserve/auth_confirm':
+                    print('Encountered server overload when loading auth_confirm page. Starting over...')
+                    self.snag_booking()
+                
+                self.advance_page_2()
+                if self._driver.current_url != self._url + 'reserve/step1':
+                    print('Encountered server overload when loading step1 page. Starting over...')
+                    self.snag_booking()
+                
+                self.pick_guests_and_date()
+            if datetime.now().strftime('%H:%M') >= '02:00':
+                self.skip_blocks = False
+                self.click_on_time()
+                if self._driver.current_url != self._url + 'reserve/step2':
+                    print('Encountered server overload or no availability when loading step2 page. Starting over...')
+                    self.snag_booking()
+                try:
+                    page_load_check = self._wait.until(EC.element_to_be_clickable((By.XPATH, "//*[@class='time-cell']")))
+                except TimeoutException:
+                    print('Timed out. Starting over...')
+                    self.snag_booking()
+                
+                self.book_if_available()
+                time.sleep(_DEFAULT_WAIT_TIME) # wait for as-yet-unknown subsequent page to load
+                if self._driver.current_url in [self._url + suffix for suffix in ['', 'reserve/auth_confirm', 'reserve/step1', 'reserve/step2']]:
+                    print('Opening was no good. Starting over...')
+                    self.snag_booking()
+            else:
+                print('Too early')
+                self.n_attempts -= 1
+                time.sleep(1)
+                self.skip_blocks = True
                 self.snag_booking()
                 
 def main(argv: List[str]):
@@ -262,4 +285,3 @@ if __name__ == '__main__':
 # lets_go.shutdown_driver()
 
 # TODO: notes for actual use case: update day_of_month=8, max_attempts (VERY HIGH), and not(contains(...))
-
