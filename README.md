@@ -16,16 +16,22 @@ You could also use `conda`, `uv`, or some other manager
 
 After activating your chosen environment, run the following to install the necessary dependencies for this project
 ```
-pip install pytz
-pip3 install selenium webdriver-manager
+pip3 install pytz selenium webdriver-manager
 ```
 
-## original bot
-The first bot I built is currently only built to be run manually when a new date is recently released for the cafe (30 days in advance, IIRC). It's intended to automate the clickops needed to get to the actual booking page on a given day. It is currently configured to automatically pick a time in the middle of the array of avaialable times for the selected booking day, though this can be modified.
+## original bot (`pcafe.py`)
+The first bot I built is currently only configured to be run manually when a new date is recently released for the cafe (30 days in advance, IIRC). It's intended to automate the clickops needed to get to the actual booking page on a given day. It is currently configured to automatically pick a time in the middle of the array of available times for the selected booking day, though this can be modified.
 
-## cancellations bot
+Example command:
+`python pcafe.py --day_of_month=20 --num_of_guests=4 --max_attempts=10`
 
-If the original bot above fails to meet your needs, you can instead rely on the cancellations bot (which I successufully used for our trip to Japan in Oct 2024!). You can set this script to run via a scheduled cron job at regular intervals (e.g. every hour). If any openings are found for your selected date(s), you can configure Pushover (a separate app available for iOS and Android) to send you a push notification. Currently the notificaitons are set to notify you even when there aren't openings (i.e. the notification will say 0 openings).
+With some more work (and maybe adapting some of the server overload logic from the cancellations bot), this bot could be a powerful way of jumping onto the website at precisely the time of opening.
+
+Note as well that the "cart" for reservations seems to last about 15 minutes, and from my experience any incomplete carts are released back into the pool precisely every 20 minutes. That is, if you're not successful right at 6:00 PM (JST) then try this bot again at 6:20, 6:40, etc. until the pool is truly exhausted.
+
+## cancellations bot (`pcafe_cancellations.py`)
+
+If the original bot above fails to meet your needs, you can instead rely on the cancellations bot (which I successufully used for our trip to Japan in Oct 2024!). You can set this script to run via a scheduled cron job at regular intervals (e.g. every hour). If any openings are found for your selected date(s), you can configure Pushover (a separate app available for iOS and Android) to send you a push notification. Currently the notifications are set to notify you even when there aren't openings (i.e. the notification will say 0 openings).
 
 If you want to just test the functionality of the script itself (i.e. without scheduling jobs or receiving notification pushes) you can just call the script directly from the terminal and see the output in the terminal:
 ```
